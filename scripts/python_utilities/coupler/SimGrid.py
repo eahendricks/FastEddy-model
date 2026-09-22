@@ -328,10 +328,10 @@ if (urban_opt == 1 and urban_heatRedis_opt == 1):
 
 # EAH ADD
 if (canopyLAD_opt == 1):
-    z0_original, canopyLAI, LAD_alpha, LAD_beta = real_lc_table_canopy(landcover_table)
+    z0_original, LAI, LAD_alpha, LAD_beta = real_lc_table_canopy(landcover_table)
     z1 = zarr[0,:,:]-data_topo
     typeLADprofile = "betafunction" # "constant" "parabola"
-    canopyLAD = canopyLAD_process(data_landc,z1,z0_original,canopyLAI,LAD_alpha,LAD_beta,typeLADprofile)
+    canopyLAD = canopyLAD_process(data_landc,z1,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile)
 # EAH END ADD
 
 # Save to netCDF file

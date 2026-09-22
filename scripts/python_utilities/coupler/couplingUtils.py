@@ -8,6 +8,9 @@ import pandas as pd
 from scipy import interpolate
 from scipy.interpolate import RectBivariateSpline
 from scipy.interpolate import BSpline, make_interp_spline
+#EAH ADD
+from scipy.special import beta as math_beta
+#EAH END ADD
 
 def parse_args():
     """ parse the command line arguments """
@@ -486,7 +489,183 @@ def SHFR_process_polygons(landcover, buildings, z1, z0_original, z0_modified, no
     return result
 
 #EAH ADD
-def canopyLAD_process(data_landc,z1,z0_original,canopyLAI,LAD_alpha,LAD_beta,typeLADprofile):
-    
+def canopyLAD_process(landcover,z1,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile):
+    result = np.zeros_like(zPos, dtype=np.float32)
+    z0m_template = xr.zeros_like(fe_data['z0m'])
+    dsFEFinal['CanopyLAD'] = xr.zeros_like(fe_data['zPos'])
+    for var in ['CanopyLAI', 'CanopyAlpha', 'CanopyBeta', 'CanopyModz0m', 'CanopyHeight']:
+        dsFEFinal[var] = z0m_template
+    lai_2d = np.vectorize(lambda x: LAI.get(x, 0.0))(landcover)
+    alpha_2d = np.vectorize(lambda x: alpha_lookup.get(x, 0.0))(landcover)
+    beta_2d = np.vectorize(lambda x: beta_lookup.get(x, 0.0))(landcover)
+    dsFEFinal["CanopyLAI"].values[:] = lai_2d
+    dsFEFinal["CanopyAlpha"].values[:] = alpha_2d
+    dsFEFinal["CanopyBeta"].values[:] = beta_2d
+    dsFEFinal["CanopyHeight"] = xr.where(fe_data["CanopyLAI"] > 0.0, 10.0 * fe_data["z0m"], 0.0)
+    canopyMask = (fe_data["zPos"][0, :, :, :] - fe_data["topoPos"][0, :, :] < \
+              fe_data["CanopyHeight"][0, :, :]).astype(int)
+    if typeLADprofile == "constant":
+        vertical_cell_count = np.sum(canopyMask, axis=0)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            lad_weights = (dsFEFinal["CanopyLAI"][0, :, :] / dsFEFinal["CanopyHeight"][0, :, :]) / vertical_cell_count
+            lad_weights = np.nan_to_num(lad_weights)  
+        dsFEFinal['CanopyLAD'][0,:,:,:] = lad_weights[np.newaxis, :, :] * canopyMask
+    elif typeLADprofile == "parabola":
+        lai_2d = fe_data["CanopyLAI"][0, :, :]
+        z_3d = fe_data["zPos"][0, :, :, :] - fe_data["topoPos"][0,:,:]
+        h_2d = fe_data["CanopyHeight"][0, :, :]
+        lad_constant = 6 * lai_2d / (h_2d ** 3)
+        parabola = lad_constant * z_3d * (h_2d - z_3d)
+        modified_canopy = parabola.where(canopyMask, other=0.0)
+        target_dims = dsFEFinal['CanopyLAD'].dims[-3:]
+        dsFEFinal['CanopyLAD'][0, :, :, :] = modified_canopy.transpose(*target_dims).values
+    elif typeLADprofile == "betafunction":
+        z_grid = fe_data["zPos"][0]
+        topo = fe_data["topoPos"][0]
+        veg_height = fe_data["CanopyHeight"][0]
+        lai = fe_data["CanopyLAI"][0]
+        alpha2d = fe_data["CanopyAlpha"][0]
+        beta2d = fe_data["CanopyBeta"][0]
+        veg_mask = veg_height > 0.0
+        safe_veg_height = veg_height.where(veg_mask)
+        safe_lai = lai.where(veg_mask)
+        normalizedHeight = (z_grid - topo) / safe_veg_height
+        normalizedHeight = normalizedHeight.clip(0.0, 1.0)
+        lad_profile = (
+            (safe_lai / safe_veg_height) * (normalizedHeight ** (alpha2d - 1.0))
+            * ((1.0 - normalizedHeight) ** (beta2d - 1.0)) / 
+            math_beta(alpha2d, beta2d)
+        )
+        modified_canopy = lad_profile.where(canopyMask, other=0.0)    
+        dsFEFinal['CanopyLAD'][0] = modified_canopy.fillna(0.0)
+    z0m_slice = dsFEFinal["z0m"][0, :, :]
+    canopyMask_2d = canopyMask[0, :, :] > 0.0
+    # Set z0 underneath canopy LAD cells to small value (smooth) to not double count drag with M-O
+    dsFEFinal["CanopyModz0m"][0, :, :] = z0m_slice.where(~canopyMask_2d, other=0.0001) 
+    result=dsFEFinal["CanopyLAD"]                                                                             
+    # Plot all canopy parameters
+    fntSize=20
+    plt.rcParams['xtick.labelsize']=fntSize
+    plt.rcParams['ytick.labelsize']=fntSize
+    reflinecolor=[0.0,0.0,0.0]
+    reflinestyle='-.'
+    reflinewidth=4
+    ds=dsFEFinal
+    Nx=fe_data['CanopyLAD'].shape[3]
+    Ny=fe_data['CanopyLAD'].shape[2]
+    iIndex=int(Nx/2)
+    jIndex=int(Ny/2)
+    fig, axs = plt.subplots(6, 2, figsize=(16, 62), sharey=False)
+    axs = axs.ravel()  # Flatten the 2D array of axes to 1D for easy indexing
+    # Adjust spacing so labels and colorbars don't overlap
+    plt.subplots_adjust(wspace=0.2, hspace=0.2)
+    # ---------------------------------------------------------------------------
+    # Panel 1: LANDCOVER in xy plane
+    # ---------------------------------------------------------------------------
+    im0 = axs[0].pcolormesh(ds.xPos[0,0,:,:]/1e3, ds.yPos[0,0,:,:]/1e3,
+                        getattr(ds, 'LandCover')[0,:,:], cmap='tab20b')
+    axs[0].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[0].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[0].set_title(r'LANDCOVER index in xy plane', fontsize=fntSize)
+    fig.colorbar(im0, ax=axs[0], orientation='horizontal', pad=0.15, shrink=0.95)
+    # ---------------------------------------------------------------------------
+    # Panel 2: z0m in xy plane
+    # ---------------------------------------------------------------------------
+    im1 = axs[1].pcolormesh(ds.xPos[0,0,:,:]/1e3, ds.yPos[0,0,:,:]/1e3,
+                        getattr(ds, 'z0m')[0,:,:], cmap='jet')
+    axs[1].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[1].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[1].set_title(r'ORIGINAL z0m [m] in xy plane', fontsize=fntSize)
+    fig.colorbar(im1, ax=axs[1], orientation='horizontal', pad=0.15, shrink=0.95)
+    # ---------------------------------------------------------------------------
+    # Panel 3: Terrain Height in xy plane
+    # ---------------------------------------------------------------------------
+    im2 = axs[2].pcolormesh(ds.xPos[0,0,:,:]/1e3, ds.yPos[0,0,:,:]/1e3,
+                        getattr(ds, 'topoPos')[0,:,:], cmap='terrain')
+    axs[2].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[2].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[2].set_title(r'Terrain Height [m] in xy plane', fontsize=fntSize)
+    fig.colorbar(im2, ax=axs[2], orientation='horizontal', pad=0.15, shrink=0.95)
+    # ---------------------------------------------------------------------------
+    # Panel 4: Canopy LAI in xy plane
+    # ---------------------------------------------------------------------------
+    im3 = axs[3].pcolormesh(ds.xPos[0,0,:,:]/1e3, ds.yPos[0,0,:,:]/1e3,
+                        getattr(ds, 'CanopyLAI')[0,:,:], cmap='jet')
+    axs[3].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[3].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[3].set_title(r'LAI [$\mathregular{m^2m^{-2}}$] in xy plane', fontsize=fntSize)
+    fig.colorbar(im3, ax=axs[3], orientation='horizontal', pad=0.15, shrink=0.95)
+    # ---------------------------------------------------------------------------
+    # Panel 5: Canopy Alpha in xy plane
+    # ---------------------------------------------------------------------------
+    im4 = axs[4].pcolormesh(ds.xPos[0,0,:,:]/1e3, ds.yPos[0,0,:,:]/1e3,
+                        getattr(ds, 'CanopyAlpha')[0,:,:], cmap='jet')
+    axs[4].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[4].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[4].set_title(r'CanopyAlpha in xy plane', fontsize=fntSize)
+    fig.colorbar(im4, ax=axs[4], orientation='horizontal', pad=0.15, shrink=0.95)
+    # ---------------------------------------------------------------------------
+    # Panel 6: Canopy Beta in xy plane
+    # ---------------------------------------------------------------------------
+    im5 = axs[5].pcolormesh(ds.xPos[0,0,:,:]/1e3, ds.yPos[0,0,:,:]/1e3,
+                        getattr(ds, 'CanopyBeta')[0,:,:], cmap='jet')
+    axs[5].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[5].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[5].set_title(r'CanopyBeta in xy plane', fontsize=fntSize)
+    fig.colorbar(im5, ax=axs[5], orientation='horizontal', pad=0.15, shrink=0.95)
+    # ---------------------------------------------------------------------------
+    # Panel 7: CanopyLAD xy plane
+    # ---------------------------------------------------------------------------
+    im6 = axs[6].pcolormesh(ds.xPos[0,0,:,:]/1e3, ds.yPos[0,0,:,:]/1e3,
+                        getattr(ds, 'CanopyLAD')[0,2,:,:], cmap='viridis')
+    axs[6].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[6].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[6].set_title(r'CanopyLAD [$\mathregular{m^2m^{-3}}$] in xy plane', fontsize=fntSize)
+    fig.colorbar(im6, ax=axs[6], orientation='horizontal', pad=0.15, shrink=0.95)
+    # ---------------------------------------------------------------------------
+    # Panel 8: CanopyLAD xz plane
+    # ---------------------------------------------------------------------------
+    im7 = axs[7].pcolormesh(ds.xPos[0,:,jIndex,:]/1e3, ds.zPos[0,:,jIndex,:],
+                        getattr(ds, 'CanopyLAD')[0,:,jIndex,:], cmap='viridis')
+    axs[7].set_ylim(0.00, 30.0)
+    axs[7].set_ylabel(r'$z$ $[\mathrm{m}]$', fontsize=fntSize)
+    axs[7].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[7].set_title(r'CanopyLAD [$\mathregular{m^2m^{-3}}$] in xz plane', fontsize=fntSize)
+    fig.colorbar(im7, ax=axs[7], orientation='horizontal', pad=0.15, shrink=0.95)
+    # ---------------------------------------------------------------------------
+    # Panel 9: CanopyLAD yz plane
+    # ---------------------------------------------------------------------------
+    im8 = axs[8].pcolormesh(ds.yPos[0,:,:,iIndex]/1e3, ds.zPos[0,:,:,iIndex],
+                        getattr(ds, 'CanopyLAD')[0,:,:,iIndex], cmap='viridis')
+    axs[8].set_ylim(0.00, 30.0)
+    axs[8].set_ylabel(r'$z$ $[\mathrm{m}]$', fontsize=fntSize)
+    axs[8].set_xlabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)  # Fixed to 'y'
+    axs[8].set_title(r'CanopyLAD [$\mathregular{m^2m^{-3}}$] in yz plane', fontsize=fntSize)
+    fig.colorbar(im8, ax=axs[8], orientation='horizontal', pad=0.15, shrink=0.95)
+    # ---------------------------------------------------------------------------
+    # Panel 10: z0m MODIFIED in xy plane
+    # ---------------------------------------------------------------------------
+    im9 = axs[9].pcolormesh(ds.xPos[0,0,:,:]/1e3, ds.yPos[0,0,:,:]/1e3,
+                        getattr(ds, 'CanopyModz0m')[0,:,:], cmap='jet')
+    axs[9].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[9].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[9].set_title(r'MODIFIED z0m [m] in xy plane', fontsize=fntSize)
+    fig.colorbar(im9, ax=axs[9], orientation='horizontal', pad=0.15, shrink=0.95)
+    # ---------------------------------------------------------------------------
+    # Panel 11: Canopy Height in xy plane
+    # ---------------------------------------------------------------------------
+    im10 = axs[10].pcolormesh(ds.xPos[0,0,:,:]/1e3, ds.yPos[0,0,:,:]/1e3,
+                        getattr(ds, 'CanopyHeight')[0,:,:], cmap='jet')
+    axs[10].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[10].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
+    axs[10].set_title(r'CanopyHeight [m] in xy plane', fontsize=fntSize)
+    fig.colorbar(im10, ax=axs[10], orientation='horizontal', pad=0.15, shrink=0.95)
+
+    axs[11].set_visible(False)
+
+    CCC='canopy_params.png'
+    plt.savefig(CCC,dpi=300,bbox_inches = "tight")
+    plt.close(fig)plt.show()
+
     return result
 # EAH END ADD
