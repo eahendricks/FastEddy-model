@@ -31,6 +31,9 @@ urban_opt = params["urban_opt"]
 FE_new_nc_path = params["FE_new_nc_path"]
 name_dom_add = params["name_dom_add"]
 urban_heatRedis_opt = params["urban_heatRedis_opt"]
+#EAH ADD
+canopyLAD_opt = params["canopyLAD_opt"]
+#END EAH ADD
 landcover_table = params["landcover_table"]
 topo_average_opt = params["topo_average_opt"]
 save_plot_opt = params["save_plot_opt"]
@@ -322,6 +325,14 @@ if (urban_opt == 1 and urban_heatRedis_opt == 1):
     z0_original, z0_modified = read_lc_table(landcover_table)
     z1 = zarr[0,:,:]-data_topo
     shfr = SHFR_process_polygons(data_landc,data_bmask,z1,z0_original,z0_modified)
+
+# EAH ADD
+if (canopyLAD_opt == 1):
+    z0_original, canopyLAI, LAD_alpha, LAD_beta = real_lc_table_canopy(landcover_table)
+    z1 = zarr[0,:,:]-data_topo
+    typeLADprofile = "betafunction" # "constant" "parabola"
+    canopyLAD = canopyLAD_process(data_landc,z1,z0_original,canopyLAI,LAD_alpha,LAD_beta,typeLADprofile)
+# EAH END ADD
 
 # Save to netCDF file
 

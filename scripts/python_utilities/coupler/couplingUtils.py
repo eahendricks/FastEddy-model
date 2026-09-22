@@ -419,6 +419,16 @@ def read_lc_table(filepath):
     z0_modified = {int(k): float(v) for k, v in zip(df.iloc[:,0], df.iloc[:,3])}
     return z0_original, z0_modified
 
+#EAH ADD
+def read_lc_table_canopy(filepath):
+    df = pd.read_csv(filepath)
+    z0_original = {int(k): float(v) for k, v in zip(df.iloc[:,0], df.iloc[:,2])}
+    canopyLAI = {int(k): float(v) for k, v in zip(df.iloc[:,0], df.iloc[:,4])}
+    LAD_alpha = {int(k): float(v) for k, v in zip(df.iloc[:,0], df.iloc[:,5])}
+    LAD_beta = {int(k): float(v) for k, v in zip(df.iloc[:,0], df.iloc[:,6])}
+    return z0_original, canopyLAI, LAD_alpha, LAD_beta
+#EAH END ADD
+
 def SHFR_process_polygons(landcover, buildings, z1, z0_original, z0_modified, nodata=0, N0 = 10, Nmin = 25, fmin = 0.10):
     result = np.zeros_like(landcover, dtype=np.float32)
     labels = np.zeros_like(landcover, dtype=np.int32)
@@ -474,3 +484,9 @@ def SHFR_process_polygons(landcover, buildings, z1, z0_original, z0_modified, no
         result[polygon_mask & ~building_mask] = no_building_value
     print(f'R0 = {r0}, R1 = {r1}, R2 = {r2}, R3 = {r3}, R4 = {r4}')
     return result
+
+#EAH ADD
+def canopyLAD_process(data_landc,z1,z0_original,canopyLAI,LAD_alpha,LAD_beta,typeLADprofile):
+    
+    return result
+# EAH END ADD
