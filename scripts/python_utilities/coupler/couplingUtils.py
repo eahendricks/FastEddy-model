@@ -493,9 +493,9 @@ def SHFR_process_polygons(landcover, buildings, z1, z0_original, z0_modified, no
 #EAH ADD
 def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile,save_plot_opt):
     result = np.zeros_like(zarr, dtype=np.float32)
-    z0_template = np.zeros_like(data_z0m)
     CanopyLAD = np.zeros_like(zarr)
-    CanopyLAI = CanopyAlpha = CanopyBeta = CanopyModz0m = CanopyHeight = z0_template    
+    CanopyModz0m = np.zeros_like(data_z0m)
+    CanopyHeight = np.zeros_like(data_z0m)
     lai_2d = np.vectorize(lambda x: LAI.get(x, 0.0))(landcover)
     alpha_2d = np.vectorize(lambda x: LAD_alpha.get(x, 0.0))(landcover)
     beta_2d = np.vectorize(lambda x: LAD_beta.get(x, 0.0))(landcover)
@@ -512,13 +512,14 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
         CanopyLAD[:,:,:] = lad_weights[np.newaxis, :, :] * canopyMask
     elif typeLADprofile == "parabola":
         lai_2d = CanopyLAI[:, :]
-        z_3d = zarr[ :, :, :] - data_topo[:,:]
-        h_2d = CanopyHeight[ :, :]
-        lad_constant = 6 * lai_2d / (h_2d ** 3)
-        parabola = lad_constant * z_3d * (h_2d - z_3d)
-        modified_canopy = np.where(canopyMask, parabola, 0.0)
-        target_axes = (0, 1, 2)
-        CanopyLAD[:, :, :] = np.transpose(modified_canopy, target_axes)
+        z_3d = zarr[:, :, :] - data_topo[np.newaxis, :, :]  # Ensure proper 3D broadcast
+        h_2d = CanopyHeight[:, :]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            lad_constant = np.where(h_2d > 0.0, 6.0 * lai_2d / (h_2d ** 3), 0.0)
+            lad_constant = np.nan_to_num(lad_constant)
+        parabola = lad_constant[np.newaxis, :, :] * z_3d * (h_2d[np.newaxis, :, :] - z_3d)
+        modified_canopy = np.where(canopyMask & (z_3d >= 0), parabola, 0.0)
+        CanopyLAD[:, :, :] = modified_canopy
     elif typeLADprofile == "betafunction":
         z_grid = zarr
         topo = data_topo
