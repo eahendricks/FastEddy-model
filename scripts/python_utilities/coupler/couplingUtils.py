@@ -10,6 +10,8 @@ from scipy.interpolate import RectBivariateSpline
 from scipy.interpolate import BSpline, make_interp_spline
 #EAH ADD
 from scipy.special import beta as math_beta
+import matplotlib
+import matplotlib.pyplot as plt
 #EAH END ADD
 
 def parse_args():
@@ -489,10 +491,10 @@ def SHFR_process_polygons(landcover, buildings, z1, z0_original, z0_modified, no
     return result
 
 #EAH ADD
-def canopyLAD_process(landcover,z1,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile):
-    result = np.zeros_like(zPos, dtype=np.float32)
-    z0_template = xr.zeros_like(data_z0m)
-    CanopyLAD = xr.zeros_like(zarr)
+def canopyLAD_process(landcover,data_z0m,zarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile):
+    result = np.zeros_like(zarr, dtype=np.float32)
+    z0_template = np.zeros_like(data_z0m)
+    CanopyLAD = np.zeros_like(zarr)
     CanopyLAI = CanopyAlpha = CanopyBeta = CanopyModz0m = CanopyHeight = z0_template    
     lai_2d = np.vectorize(lambda x: LAI.get(x, 0.0))(landcover)
     alpha_2d = np.vectorize(lambda x: LAD_alpha.get(x, 0.0))(landcover)
@@ -500,7 +502,7 @@ def canopyLAD_process(landcover,z1,z0_original,LAI,LAD_alpha,LAD_beta,typeLADpro
     CanopyLAI = lai_2d
     CanopyAlpha = alpha_2d
     CanopyBeta = beta_2d
-    CanopyHeight = xr.where(CanopyLAI > 0.0, 10.0 * data_z0, 0.0)
+    CanopyHeight = xr.where(CanopyLAI > 0.0, 10.0 * data_z0m, 0.0)
     canopyMask = (zarr[ :, :, :] - data_topo[:, :] < CanopyHeight[:, :]).astype(int)
     if typeLADprofile == "constant":
         vertical_cell_count = np.sum(canopyMask, axis=0)
@@ -514,9 +516,10 @@ def canopyLAD_process(landcover,z1,z0_original,LAI,LAD_alpha,LAD_beta,typeLADpro
         h_2d = CanopyHeight[ :, :]
         lad_constant = 6 * lai_2d / (h_2d ** 3)
         parabola = lad_constant * z_3d * (h_2d - z_3d)
-        modified_canopy = parabola.where(canopyMask, other=0.0)
-        target_dims = CanopyLAD.dims[-3:]
-        CanopyLAD[ :, :, :] = modified_canopy.transpose(*target_dims).values
+        modified_canopy = np.where(canopyMask, parabola, 0.0)
+        # EAH note to check this again
+        target_axes = (0, 1, 2)
+        CanopyLAD[:, :, :] = np.transpose(modified_canopy, target_axes)
     elif typeLADprofile == "betafunction":
         z_grid = zarr
         topo = data_topo
@@ -525,8 +528,8 @@ def canopyLAD_process(landcover,z1,z0_original,LAI,LAD_alpha,LAD_beta,typeLADpro
         alpha2d = CanopyAlpha
         beta2d = CanopyBeta
         veg_mask = veg_height > 0.0
-        safe_veg_height = veg_height.where(veg_mask)
-        safe_lai = lai.where(veg_mask)
+        safe_veg_height = np.where(veg_mask, veg_height, np.nan)
+        safe_lai = np.where(veg_mask, lai, np.nan)
         normalizedHeight = (z_grid - topo) / safe_veg_height
         normalizedHeight = normalizedHeight.clip(0.0, 1.0)
         lad_profile = (
@@ -534,12 +537,12 @@ def canopyLAD_process(landcover,z1,z0_original,LAI,LAD_alpha,LAD_beta,typeLADpro
             * ((1.0 - normalizedHeight) ** (beta2d - 1.0)) / 
             math_beta(alpha2d, beta2d)
         )
-        modified_canopy = lad_profile.where(canopyMask, other=0.0)    
-        CanopyLAD = modified_canopy.fillna(0.0)
+        modified_canopy = np.where(canopyMask, lad_profile, 0.0)
+        CanopyLAD = np.nan_to_num(modified_canopy, nan=0.0)
     z0m_slice = data_z0m[ :, :]
-    canopyMask_2d = canopyMask[ :, :] > 0.0
+    canopyMask_2d = canopyMask[0, :, :] > 0.0
     # Set z0 underneath canopy LAD cells to small value (smooth) to not double count drag with M-O
-    CanopyModz0m[ :, :] = z0m_slice.where(~canopyMask_2d, other=0.0001) 
+    CanopyModz0m[:, :] = np.where(~canopyMask_2d, z0m_slice, 0.0001)
     result=CanopyLAD                                                                             
     # Plot all canopy parameters
     fntSize=20
@@ -662,7 +665,7 @@ def canopyLAD_process(landcover,z1,z0_original,LAI,LAD_alpha,LAD_beta,typeLADpro
 
     CCC='canopy_params.png'
     plt.savefig(CCC,dpi=300,bbox_inches = "tight")
-    plt.close(fig)plt.show()
+    plt.close(fig)
 
     return result
 # EAH END ADD
