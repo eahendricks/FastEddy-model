@@ -517,7 +517,6 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
         lad_constant = 6 * lai_2d / (h_2d ** 3)
         parabola = lad_constant * z_3d * (h_2d - z_3d)
         modified_canopy = np.where(canopyMask, parabola, 0.0)
-        # EAH note to check this again
         target_axes = (0, 1, 2)
         CanopyLAD[:, :, :] = np.transpose(modified_canopy, target_axes)
     elif typeLADprofile == "betafunction":
@@ -546,7 +545,7 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
     result=CanopyLAD                                                                             
     # Plot all canopy parameters
     if (save_plot_opt == 1):
-        fntSize=13
+        fntSize=12
         plt.rcParams['xtick.labelsize']=fntSize
         plt.rcParams['ytick.labelsize']=fntSize
         reflinecolor=[0.0,0.0,0.0]

@@ -329,7 +329,7 @@ if (urban_opt == 1 and urban_heatRedis_opt == 1):
 # EAH ADD
 if (canopyLAD_opt == 1):
     z0_original, LAI, LAD_alpha, LAD_beta = read_lc_table_canopy(landcover_table)
-    typeLADprofile = "betafunction" # "constant" "parabola"
+    typeLADprofile = "parabola" #"constant" #"betafunction" # "constant" "parabola"
     canopyLAD = canopyLAD_process(Nx,Ny,data_landc,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile,save_plot_opt)
 # EAH END ADD
 
@@ -356,7 +356,8 @@ ds_data['xIndex']= xr.DataArray(np.arange(0,xarr.shape[2],dtype=np.int32),dims='
 ds_data['yIndex']= xr.DataArray(np.arange(0,xarr.shape[1],dtype=np.int32),dims='yIndex')
 ds_data['zIndex']= xr.DataArray(np.arange(0,xarr.shape[0],dtype=np.int32),dims='zIndex')
 #EAH ADD
-ds_data['CanopyLAD']= xr.DataArray(canopyLAD,dims=(['zIndex','yIndex','xIndex'])) 
+if (canopyLAD_opt == 1):
+    ds_data['CanopyLAD']= xr.DataArray(canopyLAD,dims=(['zIndex','yIndex','xIndex'])) 
 # EAH END ADD
 
 ds_data.to_netcdf(FE_new_nc,format='NETCDF4')
