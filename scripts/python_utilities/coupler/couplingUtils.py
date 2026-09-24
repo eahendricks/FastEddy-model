@@ -496,12 +496,9 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
     CanopyLAD = np.zeros_like(zarr)
     CanopyModz0m = np.zeros_like(data_z0m)
     CanopyHeight = np.zeros_like(data_z0m)
-    lai_2d = np.vectorize(lambda x: LAI.get(x, 0.0))(landcover)
-    alpha_2d = np.vectorize(lambda x: LAD_alpha.get(x, 0.0))(landcover)
-    beta_2d = np.vectorize(lambda x: LAD_beta.get(x, 0.0))(landcover)
-    CanopyLAI = lai_2d
-    CanopyAlpha = alpha_2d
-    CanopyBeta = beta_2d
+    CanopyLAI = np.vectorize(lambda x: LAI.get(x, 0.0))(landcover)
+    CanopyLADAlpha = np.vectorize(lambda x: LAD_alpha.get(x, 0.0))(landcover)
+    CanopyLADBeta = np.vectorize(lambda x: LAD_beta.get(x, 0.0))(landcover)
     CanopyHeight = xr.where(CanopyLAI > 0.0, 10.0 * data_z0m, 0.0)
     canopyMask = (zarr[ :, :, :] - data_topo[:, :] < CanopyHeight[:, :]).astype(int)
     if typeLADprofile == "constant":
@@ -511,38 +508,21 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
             lad_weights = np.nan_to_num(lad_weights)  
         CanopyLAD[:,:,:] = lad_weights[np.newaxis, :, :] * canopyMask
     elif typeLADprofile == "parabola":
-        lai_2d = CanopyLAI[:, :]
-        z_3d = zarr[:, :, :] - data_topo[np.newaxis, :, :]  # Ensure proper 3D broadcast
-        h_2d = CanopyHeight[:, :]
-        with np.errstate(divide="ignore", invalid="ignore"):
-            lad_constant = np.where(h_2d > 0.0, 6.0 * lai_2d / (h_2d ** 3), 0.0)
-            lad_constant = np.nan_to_num(lad_constant)
-        parabola = lad_constant[np.newaxis, :, :] * z_3d * (h_2d[np.newaxis, :, :] - z_3d)
-        modified_canopy = np.where(canopyMask & (z_3d >= 0), parabola, 0.0)
-        CanopyLAD[:, :, :] = modified_canopy
+        z_3d = zarr - data_topo 
+        h_safe = np.where(CanopyHeight > 0.0, CanopyHeight, np.nan)
+        lad_constant = np.nan_to_num(6.0 * CanopyLAI / (h_safe ** 3))
+        parabola = lad_constant * z_3d * (CanopyHeight - z_3d)
+        CanopyLAD = np.where(canopyMask & (z_3d >= 0), parabola, 0.0)
     elif typeLADprofile == "betafunction":
-        z_grid = zarr
-        topo = data_topo
-        veg_height = CanopyHeight
-        lai = CanopyLAI
-        alpha2d = CanopyAlpha
-        beta2d = CanopyBeta
-        veg_mask = veg_height > 0.0
-        safe_veg_height = np.where(veg_mask, veg_height, np.nan)
-        safe_lai = np.where(veg_mask, lai, np.nan)
-        normalizedHeight = (z_grid - topo) / safe_veg_height
-        normalizedHeight = normalizedHeight.clip(0.0, 1.0)
+        norm_h = ((zarr - data_topo) / np.where(CanopyHeight > 0, CanopyHeight, np.nan)).clip(0.0, 1.0)
         lad_profile = (
-            (safe_lai / safe_veg_height) * (normalizedHeight ** (alpha2d - 1.0))
-            * ((1.0 - normalizedHeight) ** (beta2d - 1.0)) / 
-            math_beta(alpha2d, beta2d)
-        )
-        modified_canopy = np.where(canopyMask, lad_profile, 0.0)
-        CanopyLAD = np.nan_to_num(modified_canopy, nan=0.0)
-    z0m_slice = data_z0m[ :, :]
-    canopyMask_2d = canopyMask[0, :, :] > 0.0
-    # Set z0 underneath canopy LAD cells to small value (smooth) to not double count drag with M-O
-    CanopyModz0m[:, :] = np.where(~canopyMask_2d, z0m_slice, 0.0001)
+            (CanopyLAI / CanopyHeight)
+            * (norm_h ** (CanopyLADAlpha - 1.0))
+            * ((1.0 - norm_h) ** (CanopyLADBeta - 1.0))
+                / scipy.special.beta(CanopyLADAlpha, CanopyLADBeta)
+            )
+        CanopyLAD = np.where(canopyMask, np.nan_to_num(lad_profile, nan=0.0), 0.0)  
+    CanopyModz0m = np.where(canopyMask[0] > 0, 0.0001, data_z0m)
     result=CanopyLAD                                                                             
     # Plot all canopy parameters
     if (save_plot_opt == 1):
