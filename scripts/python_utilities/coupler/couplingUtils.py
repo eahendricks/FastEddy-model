@@ -579,19 +579,19 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
         # Panel 5: Canopy Alpha in xy plane
         # ---------------------------------------------------------------------------
         im4 = axs[4].pcolormesh(xarr[0,:,:]/1e3, yarr[0,:,:]/1e3,
-                            CanopyAlpha[:,:], cmap='jet')
+                            CanopyLADAlpha[:,:], cmap='jet')
         axs[4].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
         axs[4].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[4].set_title(r'CanopyAlpha in xy plane', fontsize=fntSize)
+        axs[4].set_title(r'CanopyLADAlpha in xy plane', fontsize=fntSize)
         fig.colorbar(im4, ax=axs[4], orientation='horizontal', pad=0.15, shrink=0.95)
         # ---------------------------------------------------------------------------
         # Panel 6: Canopy Beta in xy plane
         # ---------------------------------------------------------------------------
         im5 = axs[5].pcolormesh(xarr[0,:,:]/1e3, yarr[0,:,:]/1e3,
-                            CanopyBeta[:,:], cmap='jet')
+                            CanopyLADBeta[:,:], cmap='jet')
         axs[5].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
         axs[5].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[5].set_title(r'CanopyBeta in xy plane', fontsize=fntSize)
+        axs[5].set_title(r'CanopyLADBeta in xy plane', fontsize=fntSize)
         fig.colorbar(im5, ax=axs[5], orientation='horizontal', pad=0.15, shrink=0.95)
         # ---------------------------------------------------------------------------
         # Panel 7: CanopyLAD xy plane
