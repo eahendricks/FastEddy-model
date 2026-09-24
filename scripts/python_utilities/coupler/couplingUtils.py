@@ -635,7 +635,7 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
         # ---------------------------------------------------------------------------
         # Panel 9: CanopyLAD yz plane
         # ---------------------------------------------------------------------------
-        im8 = axs[8].pcolormesh(xarr[:,:,iIndex]/1e3, zarr[:,:,iIndex],
+        im8 = axs[8].pcolormesh(yarr[:,:,iIndex]/1e3, zarr[:,:,iIndex],
                         CanopyLAD[:,:,iIndex], cmap='viridis')
         axs[8].set_ylim(0.00, 30.0)
         axs[8].set_ylabel(r'$z$ $[\mathrm{m}]$', fontsize=fntSize)
