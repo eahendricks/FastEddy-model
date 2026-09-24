@@ -519,7 +519,7 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
             (CanopyLAI / CanopyHeight)
             * (norm_h ** (CanopyLADAlpha - 1.0))
             * ((1.0 - norm_h) ** (CanopyLADBeta - 1.0))
-                / scipy.special.math_beta(CanopyLADAlpha, CanopyLADBeta)
+                / math_beta(CanopyLADAlpha, CanopyLADBeta)
             )
         CanopyLAD = np.where(canopyMask, np.nan_to_num(lad_profile, nan=0.0), 0.0)  
     CanopyModz0m = np.where(canopyMask[0] > 0, 0.0001, data_z0m)
