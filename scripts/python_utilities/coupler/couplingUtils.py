@@ -526,7 +526,7 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
     result=CanopyLAD                                                                             
     # Plot all canopy parameters
     if (save_plot_opt == 1):
-        fntSize=12
+        fntSize=9
         plt.rcParams['xtick.labelsize']=fntSize
         plt.rcParams['ytick.labelsize']=fntSize
         reflinecolor=[0.0,0.0,0.0]
