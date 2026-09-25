@@ -331,8 +331,8 @@ if (canopyLAD_opt == 1):
     z0_original, LAI, LAD_alpha, LAD_beta = read_lc_table_canopy(landcover_table)
     typeLADprofile = "parabola" #"constant" #"betafunction" # "constant" "parabola"
     result = canopyLAD_process(Nx,Ny,data_landc,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile,save_plot_opt)
-    canopyLAD=result["CanopyLAD"]
-    z0m_modified=result["z0m_modified"]
+    canopyLAD=result["canopyLAD"]
+    data_z0m_modified=result["data_z0m_modified"]
 # EAH END ADD
 
 # Save to netCDF file
@@ -343,9 +343,13 @@ ds_data['xPos']= xr.DataArray(xarr,dims=(['zIndex','yIndex','xIndex']))
 ds_data['yPos']= xr.DataArray(yarr,dims=(['zIndex','yIndex','xIndex']))
 ds_data['zPos']= xr.DataArray(zarr,dims=(['zIndex','yIndex','xIndex']))
 ds_data['topoPos']= xr.DataArray(data_topo.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
-ds_data['z0m']= xr.DataArray(data_z0m.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
+# EAH ADD
 if (canopyLAD_opt == 1):
-    ds_data['z0m']= xr.DataArray(z0m_modified.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
+    ds_data['z0m']= xr.DataArray(data_z0m_modified.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
+    ds_data['CanopyLAD']= xr.DataArray(canopyLAD,dims=(['zIndex','yIndex','xIndex']))
+else:
+    ds_data['z0m']= xr.DataArray(data_z0m.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
+#END EH ADD
 ds_data['z0t']= xr.DataArray(data_z0t.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
 ds_data['SeaMask']= xr.DataArray(data_SeaMask.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
 ds_data['LandCover']= xr.DataArray(data_landc.astype(dtype=np.int32),dims=(['yIndex','xIndex']))
@@ -359,10 +363,6 @@ ds_data['lon']= xr.DataArray(lon_dom.astype(dtype=np.float64),dims=(['yIndex','x
 ds_data['xIndex']= xr.DataArray(np.arange(0,xarr.shape[2],dtype=np.int32),dims='xIndex')
 ds_data['yIndex']= xr.DataArray(np.arange(0,xarr.shape[1],dtype=np.int32),dims='yIndex')
 ds_data['zIndex']= xr.DataArray(np.arange(0,xarr.shape[0],dtype=np.int32),dims='zIndex')
-#EAH ADD
-if (canopyLAD_opt == 1):
-    ds_data['CanopyLAD']= xr.DataArray(canopyLAD,dims=(['zIndex','yIndex','xIndex'])) 
-# EAH END ADD
 
 ds_data.to_netcdf(FE_new_nc,format='NETCDF4')
 

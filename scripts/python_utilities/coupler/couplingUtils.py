@@ -526,8 +526,8 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
     CanopyModz0m = np.where(canopyMask[0] > 0, 0.0001, data_z0m)
     #result=CanopyLAD                                                                             
     result = {
-        "CanopyLAD": CanopyLAD,
-        "z0m_modified": CanopyModz0m
+        "canopyLAD": CanopyLAD,
+        "data_z0m_modified": CanopyModz0m
         }
     # Plot all canopy parameters
     if (save_plot_opt == 1):
