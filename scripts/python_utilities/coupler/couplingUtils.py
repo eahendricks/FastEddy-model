@@ -8,11 +8,7 @@ import pandas as pd
 from scipy import interpolate
 from scipy.interpolate import RectBivariateSpline
 from scipy.interpolate import BSpline, make_interp_spline
-#EAH ADD
 from scipy.special import beta as math_beta
-import matplotlib
-import matplotlib.pyplot as plt
-#EAH END ADD
 
 def parse_args():
     """ parse the command line arguments """
@@ -424,7 +420,6 @@ def read_lc_table(filepath):
     z0_modified = {int(k): float(v) for k, v in zip(df.iloc[:,0], df.iloc[:,3])}
     return z0_original, z0_modified
 
-#EAH ADD
 def read_lc_table_canopy(filepath):
     df = pd.read_csv(filepath)
     z0_original = {int(k): float(v) for k, v in zip(df.iloc[:,0], df.iloc[:,2])}
@@ -432,7 +427,6 @@ def read_lc_table_canopy(filepath):
     LAD_alpha = {int(k): float(v) for k, v in zip(df.iloc[:,0], df.iloc[:,5])}
     LAD_beta = {int(k): float(v) for k, v in zip(df.iloc[:,0], df.iloc[:,6])}
     return z0_original, canopyLAI, LAD_alpha, LAD_beta
-#EAH END ADD
 
 def SHFR_process_polygons(landcover, buildings, z1, z0_original, z0_modified, nodata=0, N0 = 10, Nmin = 25, fmin = 0.10):
     result = np.zeros_like(landcover, dtype=np.float32)
@@ -490,7 +484,6 @@ def SHFR_process_polygons(landcover, buildings, z1, z0_original, z0_modified, no
     print(f'R0 = {r0}, R1 = {r1}, R2 = {r2}, R3 = {r3}, R4 = {r4}')
     return result
 
-#EAH ADD
 def canopyLAD_process(landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile):
     CanopyLAD = np.zeros_like(zarr)
     CanopyModz0m = np.zeros_like(data_z0m)
@@ -527,4 +520,3 @@ def canopyLAD_process(landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LA
         "data_z0m_modified": CanopyModz0m
         }
     return result
-# EAH END ADD

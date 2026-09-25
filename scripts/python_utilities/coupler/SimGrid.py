@@ -31,9 +31,7 @@ urban_opt = params["urban_opt"]
 FE_new_nc_path = params["FE_new_nc_path"]
 name_dom_add = params["name_dom_add"]
 urban_heatRedis_opt = params["urban_heatRedis_opt"]
-#EAH ADD
 canopyLAD_opt = params["canopyLAD_opt"]
-#END EAH ADD
 landcover_table = params["landcover_table"]
 topo_average_opt = params["topo_average_opt"]
 save_plot_opt = params["save_plot_opt"]
@@ -326,14 +324,14 @@ if (urban_opt == 1 and urban_heatRedis_opt == 1):
     z1 = zarr[0,:,:]-data_topo
     shfr = SHFR_process_polygons(data_landc,data_bmask,z1,z0_original,z0_modified)
 
-# EAH ADD
+# Create real canopy leaf area density (LAD) 
+
 if (canopyLAD_opt == 1):
     z0_original, LAI, LAD_alpha, LAD_beta = read_lc_table_canopy(landcover_table)
     typeLADprofile = "parabola" #"constant" #"betafunction" # "constant" "parabola"
     result = canopyLAD_process(data_landc,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile)
     canopyLAD=result["canopyLAD"]
     data_z0m_modified=result["data_z0m_modified"]
-# EAH END ADD
 
 # Save to netCDF file
 
@@ -343,13 +341,11 @@ ds_data['xPos']= xr.DataArray(xarr,dims=(['zIndex','yIndex','xIndex']))
 ds_data['yPos']= xr.DataArray(yarr,dims=(['zIndex','yIndex','xIndex']))
 ds_data['zPos']= xr.DataArray(zarr,dims=(['zIndex','yIndex','xIndex']))
 ds_data['topoPos']= xr.DataArray(data_topo.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
-# EAH ADD
 if (canopyLAD_opt == 1):
     ds_data['z0m']= xr.DataArray(data_z0m_modified.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
     ds_data['CanopyLAD']= xr.DataArray(canopyLAD,dims=(['zIndex','yIndex','xIndex']))
 else:
     ds_data['z0m']= xr.DataArray(data_z0m.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
-#END EH ADD
 ds_data['z0t']= xr.DataArray(data_z0t.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
 ds_data['SeaMask']= xr.DataArray(data_SeaMask.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
 ds_data['LandCover']= xr.DataArray(data_landc.astype(dtype=np.int32),dims=(['yIndex','xIndex']))
