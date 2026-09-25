@@ -330,7 +330,7 @@ if (urban_opt == 1 and urban_heatRedis_opt == 1):
 if (canopyLAD_opt == 1):
     z0_original, LAI, LAD_alpha, LAD_beta = read_lc_table_canopy(landcover_table)
     typeLADprofile = "parabola" #"constant" #"betafunction" # "constant" "parabola"
-    result = canopyLAD_process(Nx,Ny,data_landc,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile,save_plot_opt)
+    result = canopyLAD_process(data_landc,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile)
     canopyLAD=result["canopyLAD"]
     data_z0m_modified=result["data_z0m_modified"]
 # EAH END ADD

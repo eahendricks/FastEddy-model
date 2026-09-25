@@ -491,9 +491,7 @@ def SHFR_process_polygons(landcover, buildings, z1, z0_original, z0_modified, no
     return result
 
 #EAH ADD
-def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile,save_plot_opt):
-    #arr_3d = np.zeros_like(zarr, dtype=np.float32)
-    #arr_2d = np.zeros_like(data_z0m, dtype=np.float32)
+def canopyLAD_process(landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile):
     CanopyLAD = np.zeros_like(zarr)
     CanopyModz0m = np.zeros_like(data_z0m)
     CanopyHeight = np.zeros_like(data_z0m)
@@ -524,133 +522,9 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
             )
         CanopyLAD = np.where(canopyMask, np.nan_to_num(lad_profile, nan=0.0), 0.0)  
     CanopyModz0m = np.where(canopyMask[0] > 0, 0.0001, data_z0m)
-    #result=CanopyLAD                                                                             
     result = {
         "canopyLAD": CanopyLAD,
         "data_z0m_modified": CanopyModz0m
         }
-    # Plot all canopy parameters
-    if (save_plot_opt == 1):
-        fntSize=9
-        plt.rcParams['xtick.labelsize']=fntSize
-        plt.rcParams['ytick.labelsize']=fntSize
-        reflinecolor=[0.0,0.0,0.0]
-        reflinestyle='-.'
-        reflinewidth=4
-        iIndex=int(Nx/2)
-        jIndex=int(Ny/2)
-        print(iIndex,jIndex)
-        fig, axs = plt.subplots(6, 2, figsize=(8, 32), sharey=False)
-        axs = axs.ravel()  # Flatten the 2D array of axes to 1D for easy indexing
-        # Adjust spacing so labels and colorbars don't overlap
-        plt.subplots_adjust(wspace=0.2, hspace=0.2)
-        # ---------------------------------------------------------------------------
-        # Panel 1: LANDCOVER in xy plane
-        # ---------------------------------------------------------------------------
-        im0 = axs[0].pcolormesh(xarr[0,:,:]/1e3, yarr[0,:,:]/1e3,
-                        landcover[:,:], cmap='tab20b')
-        axs[0].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[0].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[0].set_title(r'LANDCOVER index in xy plane', fontsize=fntSize)
-        fig.colorbar(im0, ax=axs[0], orientation='horizontal', pad=0.15, shrink=0.95)
-        # ---------------------------------------------------------------------------
-        # Panel 2: z0m in xy plane
-        # ---------------------------------------------------------------------------
-        im1 = axs[1].pcolormesh(xarr[0,:,:]/1e3, yarr[0,:,:]/1e3,
-                            data_z0m[:,:], cmap='jet')
-        axs[1].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[1].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[1].set_title(r'ORIGINAL z0m [m] in xy plane', fontsize=fntSize)
-        fig.colorbar(im1, ax=axs[1], orientation='horizontal', pad=0.15, shrink=0.95)
-        # ---------------------------------------------------------------------------
-        # Panel 3: Terrain Height in xy plane
-        # ---------------------------------------------------------------------------
-        im2 = axs[2].pcolormesh(xarr[0,:,:]/1e3, yarr[0,:,:]/1e3,
-                            data_topo[:,:], cmap='jet')
-        axs[2].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[2].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[2].set_title(r'Terrain Height [m] in xy plane', fontsize=fntSize)
-        fig.colorbar(im2, ax=axs[2], orientation='horizontal', pad=0.15, shrink=0.95)
-        # ---------------------------------------------------------------------------
-        # Panel 4: Canopy LAI in xy plane
-        # ---------------------------------------------------------------------------
-        im3 = axs[3].pcolormesh(xarr[0,:,:]/1e3, yarr[0,:,:]/1e3,
-                            CanopyLAI[:,:], cmap='jet')
-        axs[3].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[3].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[3].set_title(r'LAI [$\mathregular{m^2m^{-2}}$] in xy plane', fontsize=fntSize)
-        fig.colorbar(im3, ax=axs[3], orientation='horizontal', pad=0.15, shrink=0.95)
-        # ---------------------------------------------------------------------------
-        # Panel 5: Canopy Alpha in xy plane
-        # ---------------------------------------------------------------------------
-        im4 = axs[4].pcolormesh(xarr[0,:,:]/1e3, yarr[0,:,:]/1e3,
-                            CanopyLADAlpha[:,:], cmap='jet')
-        axs[4].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[4].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[4].set_title(r'CanopyLADAlpha in xy plane', fontsize=fntSize)
-        fig.colorbar(im4, ax=axs[4], orientation='horizontal', pad=0.15, shrink=0.95)
-        # ---------------------------------------------------------------------------
-        # Panel 6: Canopy Beta in xy plane
-        # ---------------------------------------------------------------------------
-        im5 = axs[5].pcolormesh(xarr[0,:,:]/1e3, yarr[0,:,:]/1e3,
-                            CanopyLADBeta[:,:], cmap='jet')
-        axs[5].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[5].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[5].set_title(r'CanopyLADBeta in xy plane', fontsize=fntSize)
-        fig.colorbar(im5, ax=axs[5], orientation='horizontal', pad=0.15, shrink=0.95)
-        # ---------------------------------------------------------------------------
-        # Panel 7: CanopyLAD xy plane
-        # ---------------------------------------------------------------------------
-        im6 = axs[6].pcolormesh(xarr[0,:,:]/1e3, yarr[0,:,:]/1e3,
-                            CanopyLAD[0,:,:], cmap='jet') 
-        axs[6].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[6].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[6].set_title(r'CanopyLAD [$\mathregular{m^2m^{-3}}$] in xy plane', fontsize=fntSize)
-        fig.colorbar(im6, ax=axs[6], orientation='horizontal', pad=0.15, shrink=0.95)
-        # ---------------------------------------------------------------------------
-        # Panel 8: CanopyLAD xz plane
-        # ---------------------------------------------------------------------------
-        im7 = axs[7].pcolormesh(xarr[:,jIndex,:]/1e3, zarr[:,jIndex,:],
-                        CanopyLAD[:,jIndex,:], cmap='viridis')
-        axs[7].set_ylim(0.00, 30.0)
-        axs[7].set_ylabel(r'$z$ $[\mathrm{m}]$', fontsize=fntSize)
-        axs[7].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[7].set_title(r'CanopyLAD [$\mathregular{m^2m^{-3}}$] in xz plane', fontsize=fntSize)
-        fig.colorbar(im7, ax=axs[7], orientation='horizontal', pad=0.15, shrink=0.95)
-        # ---------------------------------------------------------------------------
-        # Panel 9: CanopyLAD yz plane
-        # ---------------------------------------------------------------------------
-        im8 = axs[8].pcolormesh(yarr[:,:,iIndex]/1e3, zarr[:,:,iIndex],
-                        CanopyLAD[:,:,iIndex], cmap='viridis')
-        axs[8].set_ylim(0.00, 30.0)
-        axs[8].set_ylabel(r'$z$ $[\mathrm{m}]$', fontsize=fntSize)
-        axs[8].set_xlabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)  # Fixed to 'y'
-        axs[8].set_title(r'CanopyLAD [$\mathregular{m^2m^{-3}}$] in yz plane', fontsize=fntSize)
-        fig.colorbar(im8, ax=axs[8], orientation='horizontal', pad=0.15, shrink=0.95)
-        # ---------------------------------------------------------------------------
-        # Panel 10: z0m MODIFIED in xy plane
-        # ---------------------------------------------------------------------------
-        im9 = axs[9].pcolormesh(xarr[0,:,:]/1e3, yarr[0,:,:]/1e3,
-                        CanopyModz0m[:,:], cmap='jet')
-        axs[9].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[9].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[9].set_title(r'MODIFIED z0m [m] in xy plane', fontsize=fntSize)
-        fig.colorbar(im9, ax=axs[9], orientation='horizontal', pad=0.15, shrink=0.95)
-        # ---------------------------------------------------------------------------
-        # Panel 11: Canopy Height in xy plane
-        # ---------------------------------------------------------------------------
-        im10 = axs[10].pcolormesh(xarr[0,:,:]/1e3, yarr[0,:,:]/1e3,
-                        CanopyHeight[:,:], cmap='jet')
-        axs[10].set_ylabel(r'$y$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[10].set_xlabel(r'$x$ $[\mathrm{km}]$', fontsize=fntSize)
-        axs[10].set_title(r'CanopyHeight [m] in xy plane', fontsize=fntSize)
-        fig.colorbar(im10, ax=axs[10], orientation='horizontal', pad=0.15, shrink=0.95)
-
-        axs[11].set_visible(False)
-
-        CCC='canopy_params_'+typeLADprofile+'.png'
-        plt.savefig(CCC,dpi=300,bbox_inches = "tight")
-        plt.close(fig)
-
     return result
 # EAH END ADD
