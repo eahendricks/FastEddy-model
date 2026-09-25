@@ -484,7 +484,7 @@ def SHFR_process_polygons(landcover, buildings, z1, z0_original, z0_modified, no
     print(f'R0 = {r0}, R1 = {r1}, R2 = {r2}, R3 = {r3}, R4 = {r4}')
     return result
 
-def canopyLAD_process(landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile):
+def canopyLAD_process(landcover,data_z0m,zarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile):
     CanopyLAD = np.zeros_like(zarr)
     CanopyModz0m = np.zeros_like(data_z0m)
     CanopyHeight = np.zeros_like(data_z0m)
