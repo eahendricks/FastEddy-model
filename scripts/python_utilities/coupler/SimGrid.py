@@ -330,7 +330,9 @@ if (urban_opt == 1 and urban_heatRedis_opt == 1):
 if (canopyLAD_opt == 1):
     z0_original, LAI, LAD_alpha, LAD_beta = read_lc_table_canopy(landcover_table)
     typeLADprofile = "parabola" #"constant" #"betafunction" # "constant" "parabola"
-    canopyLAD = canopyLAD_process(Nx,Ny,data_landc,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile,save_plot_opt)
+    result = canopyLAD_process(Nx,Ny,data_landc,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile,save_plot_opt)
+    canopyLAD=result["CanopyLAD"]
+    z0m_modified=result["z0m_modified"]
 # EAH END ADD
 
 # Save to netCDF file
@@ -342,6 +344,8 @@ ds_data['yPos']= xr.DataArray(yarr,dims=(['zIndex','yIndex','xIndex']))
 ds_data['zPos']= xr.DataArray(zarr,dims=(['zIndex','yIndex','xIndex']))
 ds_data['topoPos']= xr.DataArray(data_topo.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
 ds_data['z0m']= xr.DataArray(data_z0m.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
+if (canopyLAD_opt == 1):
+    ds_data['z0m']= xr.DataArray(z0m_modified.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
 ds_data['z0t']= xr.DataArray(data_z0t.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
 ds_data['SeaMask']= xr.DataArray(data_SeaMask.astype(dtype=np.float32),dims=(['yIndex','xIndex']))
 ds_data['LandCover']= xr.DataArray(data_landc.astype(dtype=np.int32),dims=(['yIndex','xIndex']))

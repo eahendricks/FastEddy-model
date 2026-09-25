@@ -492,7 +492,8 @@ def SHFR_process_polygons(landcover, buildings, z1, z0_original, z0_modified, no
 
 #EAH ADD
 def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile,save_plot_opt):
-    result = np.zeros_like(zarr, dtype=np.float32)
+    #arr_3d = np.zeros_like(zarr, dtype=np.float32)
+    #arr_2d = np.zeros_like(data_z0m, dtype=np.float32)
     CanopyLAD = np.zeros_like(zarr)
     CanopyModz0m = np.zeros_like(data_z0m)
     CanopyHeight = np.zeros_like(data_z0m)
@@ -523,7 +524,11 @@ def canopyLAD_process(Nx,Ny,landcover,data_z0m,zarr,xarr,yarr,data_topo,z0_origi
             )
         CanopyLAD = np.where(canopyMask, np.nan_to_num(lad_profile, nan=0.0), 0.0)  
     CanopyModz0m = np.where(canopyMask[0] > 0, 0.0001, data_z0m)
-    result=CanopyLAD                                                                             
+    #result=CanopyLAD                                                                             
+    result = {
+        "CanopyLAD": CanopyLAD,
+        "z0m_modified": CanopyModz0m
+        }
     # Plot all canopy parameters
     if (save_plot_opt == 1):
         fntSize=9
