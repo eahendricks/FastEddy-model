@@ -8,7 +8,7 @@ import pandas as pd
 from scipy import interpolate
 from scipy.interpolate import RectBivariateSpline
 from scipy.interpolate import BSpline, make_interp_spline
-from scipy.special import beta as math_beta
+from scipy.special import beta as beta_func
 
 def parse_args():
     """ parse the command line arguments """
@@ -506,14 +506,16 @@ def canopyLAD_process(landcover,data_z0m,zarr,data_topo,z0_original,LAI,LAD_alph
         parabola = lad_constant * z_3d * (CanopyHeight - z_3d)
         CanopyLAD = np.where(canopyMask & (z_3d >= 0), parabola, 0.0)
     elif typeLADprofile == "betafunction":
-        norm_h = ((zarr - data_topo) / np.where(CanopyHeight > 0, CanopyHeight, np.nan)).clip(0.0, 1.0)
+        eps = 1e-6
+        safe_height = np.where(canopyMask & (CanopyHeight > 0), CanopyHeight, np.nan)
+        norm_h = np.clip((zarr - data_topo) / safe_height, eps, 1.0 - eps)
         lad_profile = (
-            (CanopyLAI / CanopyHeight)
-            * (norm_h ** (CanopyLADAlpha - 1.0))
-            * ((1.0 - norm_h) ** (CanopyLADBeta - 1.0))
-                / math_beta(CanopyLADAlpha, CanopyLADBeta)
-            )
-        CanopyLAD = np.where(canopyMask, np.nan_to_num(lad_profile, nan=0.0), 0.0)  
+                (CanopyLAI / safe_height)
+                * (norm_h ** (CanopyLADAlpha - 1.0))
+                * ((1.0 - norm_h) ** (CanopyLADBeta - 1.0))
+                / beta_func(CanopyLADAlpha, CanopyLADBeta)
+                )
+        CanopyLAD = np.where(canopyMask, np.nan_to_num(lad_profile, nan=0.0), 0.0)
     CanopyModz0m = np.where(canopyMask[0] > 0, 0.0001, data_z0m)
     result = {
         "canopyLAD": CanopyLAD,
