@@ -492,15 +492,19 @@ def canopyLAD_process(landcover,data_z0m,zarr,data_topo,z0_original,LAI,LAD_alph
     CanopyLADAlpha = np.vectorize(lambda x: LAD_alpha.get(x, 0.0))(landcover)
     CanopyLADBeta = np.vectorize(lambda x: LAD_beta.get(x, 0.0))(landcover)
     CanopyHeight = xr.where(CanopyLAI > 0.0, 10.0 * data_z0m, 0.0)
-    canopyMask = (zarr[ :, :, :] - data_topo[:, :] < CanopyHeight[:, :]).astype(int)
+    z_3d = zarr - data_topo
+    dz_first = z_3d[0:1, :, :]
+    dz_rest = np.diff(z_3d, axis=0)
+    dz_3d = np.concatenate([dz_first, dz_rest], axis=0)
+    canopyMask = (z_3d < CanopyHeight[:, :]).astype(int)
     if typeLADprofile == "constant":
-        vertical_cell_count = np.sum(canopyMask, axis=0)
+        effective_canopy_height = np.sum(dz_3d * canopyMask, axis=0)
         with np.errstate(divide="ignore", invalid="ignore"):
-            lad_weights = (CanopyLAI[ :, :] / CanopyHeight[ :, :]) / vertical_cell_count
-            lad_weights = np.nan_to_num(lad_weights)  
-        CanopyLAD[:,:,:] = lad_weights[np.newaxis, :, :] * canopyMask
+            constant_lad = CanopyLAI / effective_canopy_height
+            constant_lad = np.nan_to_num(constant_lad, nan=0.0, posinf=0.0, neginf=0.0)
+        CanopyLAD = constant_lad[np.newaxis, :, :] * canopyMask
     elif typeLADprofile == "parabola":
-        z_3d = zarr - data_topo 
+    #    z_3d = zarr - data_topo 
         h_safe = np.where(CanopyHeight > 0.0, CanopyHeight, np.nan)
         lad_constant = np.nan_to_num(6.0 * CanopyLAI / (h_safe ** 3))
         parabola = lad_constant * z_3d * (CanopyHeight - z_3d)
@@ -516,6 +520,32 @@ def canopyLAD_process(landcover,data_z0m,zarr,data_topo,z0_original,LAI,LAD_alph
                 / beta_func(CanopyLADAlpha, CanopyLADBeta)
                 )
         CanopyLAD = np.where(canopyMask, np.nan_to_num(lad_profile, nan=0.0), 0.0)
+
+    # Option 1: Rectangular sum using cell thicknesses dz_3d (matches constant definition)
+    integrated_LAI = np.sum(CanopyLAD * dz_3d, axis=0)
+    # Option 2: Trapezoidal integration along height axis (uncomment if nodes represent interfaces/gridpoints)
+    # integrated_LAI = np.trapz(CanopyLAD, x=z_3d, axis=0)
+    # --- Category Error Printing ---
+    print("\n" + "=" * 80)
+    print(f"{'Landcover Category':<25} | {'Target LAI':<12} | {'Mean Int. LAI':<14} | {'Mean Error':<12} | {'Max Error':<12}")
+    print("=" * 80)
+    # Extract unique landcover IDs/names present in dataset
+    unique_categories = np.unique(landcover)
+    for category in unique_categories:
+        cat_mask = (landcover == category)
+        # Skip locations without canopy
+        if not np.any(cat_mask):
+            continue
+        target_lai_cat = CanopyLAI[cat_mask]
+        integrated_lai_cat = integrated_LAI[cat_mask]
+        # Absolute integration errors
+        abs_errors = np.abs(integrated_lai_cat - target_lai_cat)
+        mean_target = np.mean(target_lai_cat)
+        mean_integrated = np.mean(integrated_lai_cat)
+        mean_err = np.mean(abs_errors)
+        max_err = np.max(abs_errors)
+        print(f"{str(category):<25} | {mean_target:<12.4f} | {mean_integrated:<14.4f} | {mean_err:<12.2e} | {max_err:<12.2e}")
+    print("=" * 80 + "\n")
     CanopyModz0m = np.where(canopyMask[0] > 0, 0.0001, data_z0m)
     result = {
         "canopyLAD": CanopyLAD,
