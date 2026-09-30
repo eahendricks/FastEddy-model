@@ -485,70 +485,84 @@ def SHFR_process_polygons(landcover, buildings, z1, z0_original, z0_modified, no
     return result
 
 def canopyLAD_process(landcover,data_z0m,zarr,data_topo,z0_original,LAI,LAD_alpha,LAD_beta,typeLADprofile):
-    CanopyLAD = np.zeros_like(zarr)
-    CanopyModz0m = np.zeros_like(data_z0m)
-    CanopyHeight = np.zeros_like(data_z0m)
-    CanopyLAI = np.vectorize(lambda x: LAI.get(x, 0.0))(landcover)
-    CanopyLADAlpha = np.vectorize(lambda x: LAD_alpha.get(x, 0.0))(landcover)
-    CanopyLADBeta = np.vectorize(lambda x: LAD_beta.get(x, 0.0))(landcover)
-    CanopyHeight = xr.where(CanopyLAI > 0.0, 10.0 * data_z0m, 0.0)
+    canopy_LAD = np.zeros_like(zarr)
+    canopy_mod_z0m = np.zeros_like(data_z0m)
+    canopy_height = np.zeros_like(data_z0m)
+    canopy_LAI = np.vectorize(lambda x: LAI.get(x, 0.0))(landcover)
+    canopy_LAD_alpha = np.vectorize(lambda x: LAD_alpha.get(x, 0.0))(landcover)
+    canopy_LAD_beta = np.vectorize(lambda x: LAD_beta.get(x, 0.0))(landcover)
+    canopy_height = xr.where(canopy_LAI > 0.0, 10.0 * data_z0m, 0.0)
     z_3d = zarr - data_topo
     dz_first = z_3d[0:1, :, :]
     dz_rest = np.diff(z_3d, axis=0)
     dz_3d = np.concatenate([dz_first, dz_rest], axis=0)
-    canopyMask = (z_3d < CanopyHeight[:, :]).astype(int)
+    canopyMask = (z_3d < canopy_height[:, :]).astype(int)
     if typeLADprofile == "constant":
         effective_canopy_height = np.sum(dz_3d * canopyMask, axis=0)
         with np.errstate(divide="ignore", invalid="ignore"):
-            constant_lad = CanopyLAI / effective_canopy_height
+            constant_lad = canopy_LAI / effective_canopy_height
             constant_lad = np.nan_to_num(constant_lad, nan=0.0, posinf=0.0, neginf=0.0)
-        CanopyLAD = constant_lad[np.newaxis, :, :] * canopyMask
+        canopy_LAD = constant_lad[np.newaxis, :, :] * canopyMask
     elif typeLADprofile == "parabola":
-    #    z_3d = zarr - data_topo 
-        h_safe = np.where(CanopyHeight > 0.0, CanopyHeight, np.nan)
-        lad_constant = np.nan_to_num(6.0 * CanopyLAI / (h_safe ** 3))
-        parabola = lad_constant * z_3d * (CanopyHeight - z_3d)
-        CanopyLAD = np.where(canopyMask & (z_3d >= 0), parabola, 0.0)
+        safe_canopy_height = np.where(canopyMask & (canopy_height > 0), canopy_height, np.nan)
+        lad_constant = np.nan_to_num(6.0 * canopy_LAI / (safe_canopy_height ** 3))
+        parabola = lad_constant * z_3d * (safe_canopy_height - z_3d)
+        canopy_LAD = np.where(canopyMask, parabola, 0.0)
     elif typeLADprofile == "betafunction":
-        eps = 1e-6
-        safe_height = np.where(canopyMask & (CanopyHeight > 0), CanopyHeight, np.nan)
-        norm_h = np.clip((zarr - data_topo) / safe_height, eps, 1.0 - eps)
-        lad_profile = (
-                (CanopyLAI / safe_height)
-                * (norm_h ** (CanopyLADAlpha - 1.0))
-                * ((1.0 - norm_h) ** (CanopyLADBeta - 1.0))
-                / beta_func(CanopyLADAlpha, CanopyLADBeta)
-                )
-        CanopyLAD = np.where(canopyMask, np.nan_to_num(lad_profile, nan=0.0), 0.0)
+        safe_canopy_height = np.where(canopyMask & (canopy_height > 0), canopy_height, np.nan)
+        norm_h = np.clip(z_3d / safe_canopy_height, 0.0, 1.0)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            lad_profile = (
+                (canopy_LAI / safe_canopy_height)
+                * (norm_h ** (canopy_LAD_alpha - 1.0))
+                * ((1.0 - norm_h) ** (canopy_LAD_beta - 1.0))
+                / beta_func(canopy_LAD_alpha, canopy_LAD_beta)
+            )
+        canopy_LAD = np.where(canopyMask, np.nan_to_num(lad_profile, nan=0.0, posinf=0.0, neginf=0.0), 0.0)
+    #integrated_LAI = np.sum(canopy_LAD * dz_3d, axis=0)
+    integrated_LAI = np.trapz(canopy_LAD, x=z_3d, axis=0)
 
-    # Option 1: Rectangular sum using cell thicknesses dz_3d (matches constant definition)
-    integrated_LAI = np.sum(CanopyLAD * dz_3d, axis=0)
-    # Option 2: Trapezoidal integration along height axis (uncomment if nodes represent interfaces/gridpoints)
-    # integrated_LAI = np.trapz(CanopyLAD, x=z_3d, axis=0)
-    # --- Category Error Printing ---
-    print("\n" + "=" * 80)
-    print(f"{'Landcover Category':<25} | {'Target LAI':<12} | {'Mean Int. LAI':<14} | {'Mean Error':<12} | {'Max Error':<12}")
-    print("=" * 80)
-    # Extract unique landcover IDs/names present in dataset
+    header_fmt = "{:<30} | {:>18} | {:>12} | {:>15} | {:>12} | {:>12}"
+    row_fmt    = "{:<30} | {:>18.4f} | {:>12.4f} | {:>15.4f} | {:>12.2e} | {:>12.2e}"
+    line_len   = 112
+
+    print("\n" + "=" * line_len)
+    print(header_fmt.format("Landcover Category", "Canopy height (m)", "Target LAI", "Mean Int. LAI", "Mean Error", "Max Error"))
+    print("=" * line_len)
+
+    # Get categories actually present in the landcover grid domain
     unique_categories = np.unique(landcover)
+
     for category in unique_categories:
-        cat_mask = (landcover == category)
-        # Skip locations without canopy
+        # Ignore NaNs or fill values
+        if np.isnan(category) or category < 0:
+            continue
+
+        # Flexible mask comparison handling float/int category types
+        cat_mask = np.isclose(landcover, category) if np.issubdtype(landcover.dtype, np.floating) else (landcover == category)
+
         if not np.any(cat_mask):
             continue
-        target_lai_cat = CanopyLAI[cat_mask]
+
+        target_lai_cat = canopy_LAI[cat_mask]
+        canopy_height_table = canopy_height[cat_mask]
         integrated_lai_cat = integrated_LAI[cat_mask]
-        # Absolute integration errors
+
         abs_errors = np.abs(integrated_lai_cat - target_lai_cat)
+
         mean_target = np.mean(target_lai_cat)
+        mean_canopy_height = np.mean(canopy_height_table)
         mean_integrated = np.mean(integrated_lai_cat)
         mean_err = np.mean(abs_errors)
         max_err = np.max(abs_errors)
-        print(f"{str(category):<25} | {mean_target:<12.4f} | {mean_integrated:<14.4f} | {mean_err:<12.2e} | {max_err:<12.2e}")
-    print("=" * 80 + "\n")
-    CanopyModz0m = np.where(canopyMask[0] > 0, 0.0001, data_z0m)
+
+        print(row_fmt.format(str(category), mean_canopy_height, mean_target, mean_integrated, mean_err, max_err))
+
+    print("=" * line_len + "\n")
+
+    canopy_mod_z0 = np.where(canopyMask[0] > 0, 0.0001, data_z0m)
     result = {
-        "canopyLAD": CanopyLAD,
-        "data_z0m_modified": CanopyModz0m
+        "canopyLAD": canopy_LAD,
+        "data_z0m_modified": canopy_mod_z0
         }
     return result
