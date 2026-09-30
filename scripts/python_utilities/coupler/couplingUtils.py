@@ -522,9 +522,9 @@ def canopyLAD_process(landcover,data_z0m,zarr,data_topo,z0_original,LAI,LAD_alph
     #integrated_LAI = np.sum(canopy_LAD * dz_3d, axis=0)
     integrated_LAI = np.trapz(canopy_LAD, x=z_3d, axis=0)
 
-    header_fmt = "{:<30} | {:>18} | {:>12} | {:>15} | {:>12} | {:>12}"
-    row_fmt    = "{:<30} | {:>18.4f} | {:>12.4f} | {:>15.4f} | {:>12.2e} | {:>12.2e}"
-    line_len   = 112
+    header_fmt = "{:<20} | {:>18} | {:>12} | {:>15} | {:>12} | {:>12}"
+    row_fmt    = "{:<20} | {:>18.4f} | {:>12.4f} | {:>15.4f} | {:>12.2e} | {:>12.2e}"
+    line_len   = 104
 
     print("\n" + "=" * line_len)
     print(header_fmt.format("Landcover Category", "Canopy height (m)", "Target LAI", "Mean Int. LAI", "Mean Error", "Max Error"))
