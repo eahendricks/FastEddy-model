@@ -491,7 +491,7 @@ def canopyLAD_process(landcover,data_z0m,zarr,data_topo,z0_original,LAI,LAD_alph
     canopy_LAI = np.vectorize(lambda x: LAI.get(x, 0.0))(landcover)
     canopy_LAD_alpha = np.vectorize(lambda x: LAD_alpha.get(x, 0.0))(landcover)
     canopy_LAD_beta = np.vectorize(lambda x: LAD_beta.get(x, 0.0))(landcover)
-    canopy_height = xr.where(canopy_LAI > 0.0, 10.0 * data_z0m, 0.0)
+    canopy_height = np.where(canopy_LAI > 0.0, 10.0 * data_z0m, 0.0)
     z_3d = zarr - data_topo
     dz_first = z_3d[0:1, :, :]
     dz_rest = np.diff(z_3d, axis=0)
@@ -519,47 +519,31 @@ def canopyLAD_process(landcover,data_z0m,zarr,data_topo,z0_original,LAI,LAD_alph
                 / beta_func(canopy_LAD_alpha, canopy_LAD_beta)
             )
         canopy_LAD = np.where(canopyMask, np.nan_to_num(lad_profile, nan=0.0, posinf=0.0, neginf=0.0), 0.0)
-    #integrated_LAI = np.sum(canopy_LAD * dz_3d, axis=0)
     integrated_LAI = np.trapz(canopy_LAD, x=z_3d, axis=0)
-
     header_fmt = "{:<20} | {:>18} | {:>12} | {:>15} | {:>12} | {:>12}"
     row_fmt    = "{:<20} | {:>18.4f} | {:>12.4f} | {:>15.4f} | {:>12.2e} | {:>12.2e}"
     line_len   = 104
-
     print("\n" + "=" * line_len)
     print(header_fmt.format("Landcover Category", "Canopy height (m)", "Target LAI", "Mean Int. LAI", "Mean Error", "Max Error"))
     print("=" * line_len)
-
-    # Get categories actually present in the landcover grid domain
     unique_categories = np.unique(landcover)
-
     for category in unique_categories:
-        # Ignore NaNs or fill values
         if np.isnan(category) or category < 0:
             continue
-
-        # Flexible mask comparison handling float/int category types
         cat_mask = np.isclose(landcover, category) if np.issubdtype(landcover.dtype, np.floating) else (landcover == category)
-
         if not np.any(cat_mask):
             continue
-
         target_lai_cat = canopy_LAI[cat_mask]
         canopy_height_table = canopy_height[cat_mask]
         integrated_lai_cat = integrated_LAI[cat_mask]
-
         abs_errors = np.abs(integrated_lai_cat - target_lai_cat)
-
         mean_target = np.mean(target_lai_cat)
         mean_canopy_height = np.mean(canopy_height_table)
         mean_integrated = np.mean(integrated_lai_cat)
         mean_err = np.mean(abs_errors)
         max_err = np.max(abs_errors)
-
         print(row_fmt.format(str(category), mean_canopy_height, mean_target, mean_integrated, mean_err, max_err))
-
     print("=" * line_len + "\n")
-
     canopy_mod_z0 = np.where(canopyMask[0] > 0, 0.0001, data_z0m)
     result = {
         "canopyLAD": canopy_LAD,
